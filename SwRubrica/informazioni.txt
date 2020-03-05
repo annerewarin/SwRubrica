@@ -1,0 +1,5 @@
+Barba;Batti;Via Colpo 1;2345;45
+Anne;Sanchez;Via Vai 1;1234;12
+Carla;Campo;Via Calcio 1;3456;9
+Daria;Doria;Via Doria 1;6789;23
+Emilia;Emmy;Via Awards 1;9876;76
