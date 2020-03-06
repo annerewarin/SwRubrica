@@ -10,6 +10,11 @@ import java.io.FileNotFoundException;
 import swrubrica.Persona;
 import swrubrica.SwRubrica;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.*;
+
 /**
  *
  * @author babya
@@ -18,6 +23,9 @@ public class EditorPersona extends javax.swing.JFrame {
     
     private boolean modificaFlag = false;
     private boolean creaFlag = false;
+    private boolean salva = false;
+    private boolean annulla = false;
+   
     private String nomeV;
     private String cognomeV;
     private String indirizzoV;
@@ -25,13 +33,24 @@ public class EditorPersona extends javax.swing.JFrame {
     private int etaV;
     private Persona personaV;
     private int indexV;
+    
+    private final String url = "jdbc:postgresql://localhost:5432/rubrica_postgresql";
+    private final String username = "rubrica";
+    private final String password = "rubric@";
+    
+    private Connection conn;
+    private boolean connesso = false;
+    
+    private SwRubrica rubrica;
 
     /**
      * Creates new form EditorPersona
      */
     public EditorPersona() {
         initComponents();
+        rubrica = new SwRubrica();
         
+        rubrica.setContatti(rubrica.listaContatti());
         creaFlag = true;
         modificaFlag = false;
     }
@@ -42,7 +61,10 @@ public class EditorPersona extends javax.swing.JFrame {
     public EditorPersona(String n, String c, int i) {
         initComponents();
         
-        Persona rp = SwRubrica.contatti.get(i);
+        rubrica = new SwRubrica();
+        rubrica.setContatti(rubrica.listaContatti());
+        
+        Persona rp = rubrica.getContatti().get(i);
         personaV = rp;
         nomeV = rp.getNome();
         cognomeV = rp.getCognome();
@@ -51,9 +73,9 @@ public class EditorPersona extends javax.swing.JFrame {
         etaV = rp.getEta();
         
         System.out.println(rp.toString());
-        System.out.println(SwRubrica.contatti.indexOf(personaV));
+        System.out.println(rubrica.getContatti().indexOf(personaV));
         
-        indexV = SwRubrica.contatti.indexOf(personaV);
+        indexV = rubrica.getContatti().indexOf(personaV);
         
         nomeTF.setText(rp.getNome());
         cognomeTF.setText(rp.getCognome());
@@ -65,6 +87,8 @@ public class EditorPersona extends javax.swing.JFrame {
         creaFlag = false;
         modificaFlag = true;
     }
+    
+    
 
     /**
      * This method is called from within the constructor to initialize the form.
@@ -261,7 +285,7 @@ public class EditorPersona extends javax.swing.JFrame {
     }//GEN-LAST:event_annullaBFocusGained
 
     private void salvaBActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_salvaBActionPerformed
-        
+        salva = true;
         boolean valida = true;
         String nome = nomeTF.getText();
         if(nome.equals("")){
@@ -302,39 +326,111 @@ public class EditorPersona extends javax.swing.JFrame {
         
         Persona p = new Persona(nome, cognome, indirizzo, telefono, eta);
         if(creaFlag && valida){
-            SwRubrica.contatti.add(p);
-            creaFlag = false;
-            
-            try {
-                SwRubrica.finestra.aggiornaFinestra();
-            } catch (FileNotFoundException ex) {
-                System.err.println(ex);
+            try{
+                System.out.println("Crea contatto");
+                rubrica.creaContatto(p);
+                int index = rubrica.trovaIndice(nome, cognome, telefono);
+                
+                try {
+                    conn = DriverManager.getConnection(url, username, password);
+                    connesso = true;
+                    System.out.println("Connesso a PostgreSQL server.");
+                    System.out.println("Nel salvaCreaAction");
+
+                    Statement stat = conn.createStatement();
+                   
+                    String sql = "insert into Persone values(?,?,?,?,?,?);";
+                    
+                    PreparedStatement ps = conn.prepareStatement(sql);
+                    
+                    ps.setInt(1, index);
+                    System.out.print(index+" ");
+                    ps.setString(2, rubrica.getContatti().get(index).getNome());
+                    System.out.print(rubrica.getContatti().get(index).getNome()+" ");
+                    ps.setString(3, rubrica.getContatti().get(index).getCognome());
+                    System.out.print(rubrica.getContatti().get(index).getCognome()+" ");
+                    ps.setString(4, rubrica.getContatti().get(index).getIndirizzo());
+                    System.out.print(rubrica.getContatti().get(index).getIndirizzo()+" ");
+                    ps.setString(5, rubrica.getContatti().get(index).getTelefono());
+                    System.out.print(rubrica.getContatti().get(index).getTelefono()+" ");
+                    ps.setInt(6, rubrica.getContatti().get(index).getEta());
+                    System.out.println(rubrica.getContatti().get(index).getEta());
+                    ps.addBatch();
+              
+                    
+                    conn.setAutoCommit(false);
+                    ps.executeBatch();
+                    conn.setAutoCommit(true);
+
+                    conn.close();
+                } catch (SQLException e) {
+                    System.out.println(e.getMessage());
+                }
+                
             }
+            catch(FileNotFoundException e){System.err.println(e);}
+            
+            creaFlag = false;
+         
         }
         if(modificaFlag && valida){
             
-            System.out.println("index= "+indexV);
-            SwRubrica.contatti.set(indexV, p);
+            rubrica.modificaContatto(indexV, p);
+
+                    
+            int index = indexV;
+                
+            try {
+                conn = DriverManager.getConnection(url, username, password);
+                connesso = true;
+                System.out.println("Connesso a PostgreSQL server.");
+
+                Statement stat = conn.createStatement();
+         
+                String sql = "update Persone set nome=?, cognome=?, indirizzo=?, telefono=?, eta=? where id=?;";
+              
+                PreparedStatement ps = conn.prepareStatement(sql);
+               
+                ps.setString(1, rubrica.getContatti().get(index).getNome()+" ");
+                System.out.print(rubrica.getContatti().get(index).getNome()+" ");
+                ps.setString(2, rubrica.getContatti().get(index).getCognome());
+                System.out.print(rubrica.getContatti().get(index).getCognome()+" ");
+                ps.setString(3, rubrica.getContatti().get(index).getIndirizzo());
+                System.out.print(rubrica.getContatti().get(index).getIndirizzo()+" ");
+                ps.setString(4, rubrica.getContatti().get(index).getTelefono());
+                System.out.print(rubrica.getContatti().get(index).getTelefono()+" ");
+                ps.setInt(5, rubrica.getContatti().get(index).getEta());
+                System.out.print(rubrica.getContatti().get(index).getEta());
+                ps.setInt(6, index);
+                System.out.println(index);
+                ps.addBatch();
+
+                conn.setAutoCommit(false);
+                ps.executeBatch();
+                conn.setAutoCommit(true);
+
+                conn.close();
+            } catch (SQLException e) {
+                System.out.println(e.getMessage());
+            }        
             
             modificaFlag = false;
-            try {
-                SwRubrica.finestra.modificaFinestra(indexV);
-            } catch (FileNotFoundException ex2) {
-                System.err.println(ex2);
-            }    
+
         }
         
         if(valida){
             super.dispose();
-            SwRubrica.finestra.setVisible(true);
+            FinestraPrincipale fp = new FinestraPrincipale();
+            fp.setVisible(true);
         }
 
     }//GEN-LAST:event_salvaBActionPerformed
 
     private void annullaBActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_annullaBActionPerformed
-        
+        annulla = true;
+        FinestraPrincipale fp = new FinestraPrincipale();
+        fp.setVisible(true);
         super.dispose();
-        SwRubrica.finestra.setVisible(true);
     }//GEN-LAST:event_annullaBActionPerformed
 
     private void nomeTFMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_nomeTFMouseClicked
@@ -363,7 +459,10 @@ public class EditorPersona extends javax.swing.JFrame {
     }//GEN-LAST:event_etaTFMouseClicked
 
     private void formWindowClosed(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowClosed
-        SwRubrica.finestra.setVisible(true);
+        if(!salva && !annulla){
+            FinestraPrincipale fp = new FinestraPrincipale();
+            fp.setVisible(true);
+        }
     }//GEN-LAST:event_formWindowClosed
 
     /**

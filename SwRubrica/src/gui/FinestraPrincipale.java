@@ -15,6 +15,12 @@ import javax.swing.table.DefaultTableModel;
 import swrubrica.Persona;
 import swrubrica.SwRubrica;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.*;
+import java.util.Vector;
+
 /**
  *
  * @author babya
@@ -27,12 +33,23 @@ public class FinestraPrincipale extends javax.swing.JFrame {
     private static String nomeSel;
     private static String cognomeSel;
     private static String telefonoSel;
+    
+    private final String url = "jdbc:postgresql://localhost:5432/rubrica_postgresql";
+    private final String username = "rubrica";
+    private final String password = "rubric@";
+    
+    private Connection conn;
+    private boolean connesso = false;
+    
+    private SwRubrica rubrica;
 
     /**
      * Creates new form FinestraPrincipale
      */
     public FinestraPrincipale() {
         initComponents();
+        
+        rubrica = new SwRubrica();
         
         initJTable();
         
@@ -47,15 +64,75 @@ public class FinestraPrincipale extends javax.swing.JFrame {
         model = (DefaultTableModel) table.getModel();
         
         Object rowData[] = new Object[3];
-        SwRubrica.aggiornaListaSwRubrica();
+        Vector<Persona> lista = new Vector<Persona>();
         
-        if(!SwRubrica.contatti.isEmpty()){
+        conn = null;
+        
+        try {
+            conn = DriverManager.getConnection(url, username, password);
+            connesso = true;
+            System.out.println("Connesso a PostgreSQL server.");
+            System.out.println("Nel initJTable");
             
-            for(int ii=0; ii<SwRubrica.contatti.size(); ii++){
+            Statement stat = conn.createStatement();
+            //stat.executeUpdate("drop table if exists Persone;");
+            //stat.executeUpdate("drop table if exists persone;");
+            stat.executeUpdate("create table if not exists Persone (id Integer primary key, nome varchar, cognome varchar, indirizzo varchar, telefono varchar, eta Integer);");
+            
+            String sql = "select * from Persone;";
 
-                rowData[0] = SwRubrica.contatti.get(ii).getNome();
-                rowData[1] = SwRubrica.contatti.get(ii).getCognome();
-                rowData[2] = SwRubrica.contatti.get(ii).getTelefono();
+            ResultSet rs = stat.executeQuery(sql);
+            while(rs.next()){
+                Persona p = new Persona(rs.getString("nome"), rs.getString("cognome"), rs.getString("indirizzo"), rs.getString("telefono"), rs.getInt("eta"));
+                lista.addElement(p);
+                System.out.println("results");
+                System.out.println("id:"+rs.getInt("id")+" nome:"+rs.getString("nome"));
+            }
+            
+            rs.close();
+            
+            PreparedStatement ps;
+            if(lista.isEmpty()){
+                System.out.println("Database vuota");
+                ps = conn.prepareStatement("insert into persone(id, nome, cognome, indirizzo, telefono, eta) values(? ,? ,? ,? ,? ,?);");
+                for(int index=0; index<rubrica.getContatti().size(); index++){
+                    
+                    ps.setInt(1, index);
+                    System.out.print(index+" ");
+                    ps.setString(2, rubrica.getContatti().get(index).getNome());
+                    System.out.print(rubrica.getContatti().get(index).getNome()+" ");
+                    ps.setString(3, rubrica.getContatti().get(index).getCognome());
+                    System.out.print(rubrica.getContatti().get(index).getCognome()+" ");
+                    ps.setString(4, rubrica.getContatti().get(index).getIndirizzo());
+                    System.out.print(rubrica.getContatti().get(index).getIndirizzo()+" ");
+                    ps.setString(5, rubrica.getContatti().get(index).getTelefono());
+                    System.out.print(rubrica.getContatti().get(index).getTelefono()+" ");
+                    ps.setInt(6, rubrica.getContatti().get(index).getEta());
+                    System.out.println(rubrica.getContatti().get(index).getEta());
+                    ps.addBatch();
+                }
+        
+                conn.setAutoCommit(false);
+                ps.executeBatch();
+                conn.setAutoCommit(true);
+            }
+            else{
+                rubrica.setContatti(lista);
+            }
+    
+            conn.close();
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+        
+        if(!rubrica.getContatti().isEmpty()){
+            
+            for(int ii=0; ii<rubrica.getContatti().size(); ii++){
+                System.out.println(rubrica.getContatti().get(ii).toString());
+
+                rowData[0] = rubrica.getContatti().get(ii).getNome();
+                rowData[1] = rubrica.getContatti().get(ii).getCognome();
+                rowData[2] = rubrica.getContatti().get(ii).getTelefono();
                 model.addRow(rowData);
             }  
         }        
@@ -75,7 +152,7 @@ public class FinestraPrincipale extends javax.swing.JFrame {
             int[] selectedRow = table.getSelectedRows();
             if(selectedRow.length==0){
                 selected=false;
-                System.out.println("Nessun contatto selezionato.");
+               
             }
             else
                 selected=true;
@@ -99,14 +176,14 @@ public class FinestraPrincipale extends javax.swing.JFrame {
             telefonoSel = telefono;
             int ind =0;
             try{
-                for(int i=0; i<SwRubrica.contatti.size(); i++){
-                    Persona p = SwRubrica.contatti.get(i);
+                for(int i=0; i<rubrica.getContatti().size(); i++){
+                    Persona p = rubrica.getContatti().get(i);
                     if((p.getNome().compareTo(nomeSel)==0) && (p.getCognome().compareTo(cognomeSel)==0) && (p.getTelefono().compareTo(telefonoSel)==0))
-                        ind = SwRubrica.contatti.indexOf(p);
+                        ind = rubrica.getContatti().indexOf(p);
                 }
             
             }
-            catch(NullPointerException e2){  System.err.println(e2);  }
+            catch(NullPointerException e2){  System.out.println("Nel initSelectorListener");System.err.println(e2);  }
             
             indexSel = ind;
             System.out.println("Selected: " + nome + " " + cognome+ " "+ind);
@@ -118,17 +195,21 @@ public class FinestraPrincipale extends javax.swing.JFrame {
     /*
     Aggiorna la tabella della Finestra Principale dopo una creazione.
     */
-    public void aggiornaFinestra() throws FileNotFoundException{
+    public void aggiornaFinestra(Persona p, int i) throws FileNotFoundException{
         model = (DefaultTableModel) table.getModel();
+      
         
         Object rowData[] = new Object[3];
+        /*
+        rowData[0] = rubrica.getContatti().lastElement().getNome();
+        rowData[1] = rubrica.getContatti().lastElement().getCognome();
+        rowData[2] = rubrica.getContatti().lastElement().getTelefono();
+        */
+        rowData[0] = p.getNome();
+        rowData[1] = p.getCognome();
+        rowData[2] = p.getTelefono();
         
-        rowData[0] = SwRubrica.contatti.lastElement().getNome();
-        rowData[1] = SwRubrica.contatti.lastElement().getCognome();
-        rowData[2] = SwRubrica.contatti.lastElement().getTelefono();
-        model.addRow(rowData);
-        
-        SwRubrica.aggiornaFileSwRubrica();
+        model.insertRow(i, rowData);
    
     }
     
@@ -140,14 +221,13 @@ public class FinestraPrincipale extends javax.swing.JFrame {
         
         Object rowData[] = new Object[3];
          
-        rowData[0] = SwRubrica.contatti.get(i).getNome();
-        rowData[1] = SwRubrica.contatti.get(i).getCognome();
-        rowData[2] = SwRubrica.contatti.get(i).getTelefono();
+        rowData[0] = rubrica.getContatti().get(i).getNome();
+        rowData[1] = rubrica.getContatti().get(i).getCognome();
+        rowData[2] = rubrica.getContatti().get(i).getTelefono();
 
         model.removeRow(i);
         model.insertRow(i, rowData);
-        
-        SwRubrica.aggiornaFileSwRubrica();
+
     }
     
     /*
@@ -157,8 +237,7 @@ public class FinestraPrincipale extends javax.swing.JFrame {
         model = (DefaultTableModel) table.getModel();
 
         model.removeRow(i);
-        
-        SwRubrica.aggiornaFileSwRubrica();
+
     }
 
     /**
@@ -313,7 +392,8 @@ public class FinestraPrincipale extends javax.swing.JFrame {
         
         EditorPersona ep = new EditorPersona();
         ep.setVisible(true);
-        SwRubrica.finestra.setVisible(false);
+        super.dispose();
+        
     }//GEN-LAST:event_creaBActionPerformed
 
     private void modificaBActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_modificaBActionPerformed
@@ -321,7 +401,7 @@ public class FinestraPrincipale extends javax.swing.JFrame {
         if(selected){
             EditorPersona ep = new EditorPersona(nomeSel, cognomeSel, indexSel);
             ep.setVisible(true);
-            SwRubrica.finestra.setVisible(false);
+            super.dispose();
         }
         else{
             JOptionPane.showMessageDialog(null, "Seleziona un contatto.");
@@ -331,10 +411,35 @@ public class FinestraPrincipale extends javax.swing.JFrame {
     private void eliminaBActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_eliminaBActionPerformed
         
         if(selected){
-            Persona p = SwRubrica.contatti.get(indexSel);
+            Persona p = rubrica.getContatti().get(indexSel);
             int input = JOptionPane.showConfirmDialog(null, "Elimina la persona "+p.getNome().toUpperCase()+" "+p.getCognome().toUpperCase()+"?");
             if(input==0){
-                SwRubrica.contatti.remove(indexSel);
+                rubrica.getContatti().remove(indexSel);
+                rubrica.aggiornaFileSwRubrica();
+                
+                try {
+                    conn = DriverManager.getConnection(url, username, password);
+                    connesso = true;
+                    System.out.println("Connesso a PostgreSQL server.");
+                    
+
+                    Statement stat = conn.createStatement();
+                   
+                    String sql = "delete from Persone where id=?;";
+                    //Vector<Persona> lista = new Vector<Persona>();
+                    PreparedStatement ps = conn.prepareStatement(sql);
+                    ps.setInt(1, indexSel);
+                    ps.addBatch();
+                    
+                    conn.setAutoCommit(false);
+                    ps.executeBatch();
+                    conn.setAutoCommit(true);
+
+                    conn.close();
+                } catch (SQLException e) {
+                    System.out.println(e.getMessage());
+                }
+                
                 try {
                     eliminaFinestra(indexSel);
                 } catch (FileNotFoundException ex) {
