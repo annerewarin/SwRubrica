@@ -6,7 +6,6 @@
 package gui;
 
 import java.awt.Color;
-import java.io.FileNotFoundException;
 import javax.swing.JOptionPane;
 import javax.swing.ListSelectionModel;
 import javax.swing.event.ListSelectionEvent;
@@ -20,28 +19,31 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.*;
 import java.util.Vector;
+import swrubrica.DettagliConnessione;
 
 /**
  *
- * @author babya
+ * @author anne
  */
 public class FinestraPrincipale extends javax.swing.JFrame {
     
     DefaultTableModel model;
     private boolean selected=false;
     private int indexSel;
+    private int indexSelTab;
     private static String nomeSel;
     private static String cognomeSel;
     private static String telefonoSel;
     
-    private final String url = "jdbc:postgresql://localhost:5432/rubrica_postgresql";
-    private final String username = "rubrica";
-    private final String password = "rubric@";
+    private String url = "";
+    private String username = "";
+    private String password = "";
     
     private Connection conn;
     private boolean connesso = false;
     
     private SwRubrica rubrica;
+    private int userid;
 
     /**
      * Creates new form FinestraPrincipale
@@ -49,8 +51,34 @@ public class FinestraPrincipale extends javax.swing.JFrame {
     public FinestraPrincipale() {
         initComponents();
         
+        DettagliConnessione dc = new DettagliConnessione();
+        dc.settaDettagli();
+        url = dc.getUrl();
+        username = dc.getUsername();
+        password = dc.getPassword();
+        
         rubrica = new SwRubrica();
         
+        //initJTable();
+        
+        initSelectorListener();
+    }
+    
+    /*
+    Costruisce una Finestra Principale per un utente specificato.
+    */
+    public FinestraPrincipale(int u) {
+        initComponents();
+        
+        DettagliConnessione dc = new DettagliConnessione();
+        dc.settaDettagli();
+        url = dc.getUrl();
+        username = dc.getUsername();
+        password = dc.getPassword();
+        
+        rubrica = new SwRubrica();
+        userid = u;
+        rubrica.setContatti(getLista(userid));
         initJTable();
         
         initSelectorListener();
@@ -64,67 +92,7 @@ public class FinestraPrincipale extends javax.swing.JFrame {
         model = (DefaultTableModel) table.getModel();
         
         Object rowData[] = new Object[3];
-        Vector<Persona> lista = new Vector<Persona>();
-        
-        conn = null;
-        
-        try {
-            conn = DriverManager.getConnection(url, username, password);
-            connesso = true;
-            System.out.println("Connesso a PostgreSQL server.");
-            System.out.println("Nel initJTable");
-            
-            Statement stat = conn.createStatement();
-            //stat.executeUpdate("drop table if exists Persone;");
-            //stat.executeUpdate("drop table if exists persone;");
-            stat.executeUpdate("create table if not exists Persone (id Integer primary key, nome varchar, cognome varchar, indirizzo varchar, telefono varchar, eta Integer);");
-            
-            String sql = "select * from Persone;";
-
-            ResultSet rs = stat.executeQuery(sql);
-            while(rs.next()){
-                Persona p = new Persona(rs.getString("nome"), rs.getString("cognome"), rs.getString("indirizzo"), rs.getString("telefono"), rs.getInt("eta"));
-                lista.addElement(p);
-                System.out.println("results");
-                System.out.println("id:"+rs.getInt("id")+" nome:"+rs.getString("nome"));
-            }
-            
-            rs.close();
-            
-            PreparedStatement ps;
-            if(lista.isEmpty()){
-                System.out.println("Database vuota");
-                ps = conn.prepareStatement("insert into persone(id, nome, cognome, indirizzo, telefono, eta) values(? ,? ,? ,? ,? ,?);");
-                for(int index=0; index<rubrica.getContatti().size(); index++){
-                    
-                    ps.setInt(1, index);
-                    System.out.print(index+" ");
-                    ps.setString(2, rubrica.getContatti().get(index).getNome());
-                    System.out.print(rubrica.getContatti().get(index).getNome()+" ");
-                    ps.setString(3, rubrica.getContatti().get(index).getCognome());
-                    System.out.print(rubrica.getContatti().get(index).getCognome()+" ");
-                    ps.setString(4, rubrica.getContatti().get(index).getIndirizzo());
-                    System.out.print(rubrica.getContatti().get(index).getIndirizzo()+" ");
-                    ps.setString(5, rubrica.getContatti().get(index).getTelefono());
-                    System.out.print(rubrica.getContatti().get(index).getTelefono()+" ");
-                    ps.setInt(6, rubrica.getContatti().get(index).getEta());
-                    System.out.println(rubrica.getContatti().get(index).getEta());
-                    ps.addBatch();
-                }
-        
-                conn.setAutoCommit(false);
-                ps.executeBatch();
-                conn.setAutoCommit(true);
-            }
-            else{
-                rubrica.setContatti(lista);
-            }
-    
-            conn.close();
-        } catch (SQLException e) {
-            System.out.println(e.getMessage());
-        }
-        
+       
         if(!rubrica.getContatti().isEmpty()){
             
             for(int ii=0; ii<rubrica.getContatti().size(); ii++){
@@ -162,15 +130,16 @@ public class FinestraPrincipale extends javax.swing.JFrame {
             String telefono = null;
             int index = 0;
             indexSel=0;
-            
+            indexSelTab=table.getSelectedRow();;
+          
             for (int i = 0; i < selectedRow.length; i++, index++) {
               
-              nome = (String) table.getValueAt(selectedRow[i], 0);
-              cognome = (String) table.getValueAt(selectedRow[i], 1);
-              telefono = (String) table.getValueAt(selectedRow[i], 2);
-              
+                nome = (String) table.getValueAt(selectedRow[i], 0);
+                cognome = (String) table.getValueAt(selectedRow[i], 1);
+                telefono = (String) table.getValueAt(selectedRow[i], 2);
+     
             }
-            
+ 
             nomeSel = nome;
             cognomeSel = cognome;
             telefonoSel = telefono;
@@ -179,32 +148,71 @@ public class FinestraPrincipale extends javax.swing.JFrame {
                 for(int i=0; i<rubrica.getContatti().size(); i++){
                     Persona p = rubrica.getContatti().get(i);
                     if((p.getNome().compareTo(nomeSel)==0) && (p.getCognome().compareTo(cognomeSel)==0) && (p.getTelefono().compareTo(telefonoSel)==0))
-                        ind = rubrica.getContatti().indexOf(p);
+                        ind = p.getId();
                 }
             
             }
             catch(NullPointerException e2){  System.out.println("Nel initSelectorListener");System.err.println(e2);  }
             
             indexSel = ind;
-            System.out.println("Selected: " + nome + " " + cognome+ " "+ind);
+            System.out.println("Selected: " + nome + " " + cognome+ " "+indexSel);
+            System.out.println("Selected row: " + nome + " " + cognome+ " "+indexSelTab);
           }
 
         });
     }
     
     /*
+    Recupera la lista di contatti dell'utente corrente.
+    */
+    public Vector<Persona> getLista(int u){
+        Vector<Persona> lista = new Vector<Persona>();
+        Vector<Persona> listaNuova = new Vector<Persona>();
+        try {
+            conn = DriverManager.getConnection(url, username, password);
+            connesso = true;
+            System.out.println("Connesso a PostgreSQL server.");
+
+            PreparedStatement stat = conn.prepareStatement("select * from persone where userid=?;");    
+            stat.setInt(1, u);    
+
+            ResultSet rs = stat.executeQuery();
+            
+            while(rs.next()){
+                int index = rs.getInt("id");
+                String nome = rs.getString("nome");
+                String cognome = rs.getString("cognome");
+                String indirizzo = rs.getString("indirizzo");
+                String telefono = rs.getString("telefono");
+                int eta = rs.getInt("eta");
+                System.out.println(index+" "+nome+" "+cognome+" "+indirizzo+" "+telefono+" "+eta);
+                Persona p = new Persona(nome, cognome, indirizzo, telefono, eta);
+                p.setId(index);
+                lista.add(p);
+            }
+
+            rs.close(); 
+
+            conn.setAutoCommit(false);
+            
+            conn.setAutoCommit(true);
+
+            conn.close();
+        } catch (SQLException e) {
+                System.out.println(e.getMessage());
+        }
+ 
+        return lista;
+    }
+    
+    /*
     Aggiorna la tabella della Finestra Principale dopo una creazione.
     */
-    public void aggiornaFinestra(Persona p, int i) throws FileNotFoundException{
+    public void aggiornaFinestra(Persona p, int i){
         model = (DefaultTableModel) table.getModel();
-      
         
         Object rowData[] = new Object[3];
-        /*
-        rowData[0] = rubrica.getContatti().lastElement().getNome();
-        rowData[1] = rubrica.getContatti().lastElement().getCognome();
-        rowData[2] = rubrica.getContatti().lastElement().getTelefono();
-        */
+
         rowData[0] = p.getNome();
         rowData[1] = p.getCognome();
         rowData[2] = p.getTelefono();
@@ -216,7 +224,7 @@ public class FinestraPrincipale extends javax.swing.JFrame {
     /*
     Modifica della tabella della Finestra Principale dopo una modifica.
     */
-    public void modificaFinestra(int i) throws FileNotFoundException{
+    public void modificaFinestra(int i){
         model = (DefaultTableModel) table.getModel();
         
         Object rowData[] = new Object[3];
@@ -233,11 +241,11 @@ public class FinestraPrincipale extends javax.swing.JFrame {
     /*
     Elimina di un elemento della tabella della Finestra Principale dopo eliminazione.
     */
-    public void eliminaFinestra(int i) throws FileNotFoundException{
+    public void eliminaFinestra(int i){
         model = (DefaultTableModel) table.getModel();
 
         model.removeRow(i);
-
+ 
     }
 
     /**
@@ -255,6 +263,7 @@ public class FinestraPrincipale extends javax.swing.JFrame {
         eliminaB = new javax.swing.JButton();
         jScrollPane1 = new javax.swing.JScrollPane();
         table = new javax.swing.JTable();
+        logoutB = new javax.swing.JButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setTitle("Rubrica");
@@ -352,22 +361,42 @@ public class FinestraPrincipale extends javax.swing.JFrame {
             table.getColumnModel().getColumn(2).setResizable(false);
         }
 
+        logoutB.setFont(new java.awt.Font("Verdana", 1, 12)); // NOI18N
+        logoutB.setIcon(new javax.swing.ImageIcon(getClass().getResource("/gui/images/logout.png"))); // NOI18N
+        logoutB.setText("Logout");
+        logoutB.setBorder(new javax.swing.border.SoftBevelBorder(javax.swing.border.BevelBorder.RAISED));
+        logoutB.setFocusable(false);
+        logoutB.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
+        logoutB.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+        logoutB.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                logoutBActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(jToolBar1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+            .addGroup(layout.createSequentialGroup()
+                .addComponent(jToolBar1, javax.swing.GroupLayout.PREFERRED_SIZE, 403, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(logoutB, javax.swing.GroupLayout.PREFERRED_SIZE, 110, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 0, Short.MAX_VALUE))
             .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(27, Short.MAX_VALUE))
+                .addComponent(jScrollPane1)
+                .addContainerGap())
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
-                .addComponent(jToolBar1, javax.swing.GroupLayout.PREFERRED_SIZE, 48, Short.MAX_VALUE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 369, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jToolBar1, javax.swing.GroupLayout.DEFAULT_SIZE, 62, Short.MAX_VALUE)
+                    .addComponent(logoutB, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 547, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap())
         );
 
         pack();
@@ -390,7 +419,7 @@ public class FinestraPrincipale extends javax.swing.JFrame {
 
     private void creaBActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_creaBActionPerformed
         
-        EditorPersona ep = new EditorPersona();
+        EditorPersona ep = new EditorPersona(userid);
         ep.setVisible(true);
         super.dispose();
         
@@ -399,7 +428,7 @@ public class FinestraPrincipale extends javax.swing.JFrame {
     private void modificaBActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_modificaBActionPerformed
         
         if(selected){
-            EditorPersona ep = new EditorPersona(nomeSel, cognomeSel, indexSel);
+            EditorPersona ep = new EditorPersona(nomeSel, cognomeSel, indexSel, userid);
             ep.setVisible(true);
             super.dispose();
         }
@@ -411,46 +440,55 @@ public class FinestraPrincipale extends javax.swing.JFrame {
     private void eliminaBActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_eliminaBActionPerformed
         
         if(selected){
-            Persona p = rubrica.getContatti().get(indexSel);
-            int input = JOptionPane.showConfirmDialog(null, "Elimina la persona "+p.getNome().toUpperCase()+" "+p.getCognome().toUpperCase()+"?");
-            if(input==0){
-                rubrica.getContatti().remove(indexSel);
-                rubrica.aggiornaFileSwRubrica();
-                
-                try {
-                    conn = DriverManager.getConnection(url, username, password);
-                    connesso = true;
-                    System.out.println("Connesso a PostgreSQL server.");
-                    
+            Persona p;
+            for(int i=0; i<rubrica.getContatti().size(); i++){
+                Persona c = rubrica.getContatti().get(i);
+                if(c.getId()==indexSel){
+                    p = c;
+                    int input = JOptionPane.showConfirmDialog(null, "Elimina la persona "+p.getNome().toUpperCase()+" "+p.getCognome().toUpperCase()+"?");
+                    if(input==0){
+                        rubrica.eliminaContatto(p);
+                        try {
+                            conn = DriverManager.getConnection(url, username, password);
+                            connesso = true;
+                            System.out.println("Connesso a PostgreSQL server.");
 
-                    Statement stat = conn.createStatement();
-                   
-                    String sql = "delete from Persone where id=?;";
-                    //Vector<Persona> lista = new Vector<Persona>();
-                    PreparedStatement ps = conn.prepareStatement(sql);
-                    ps.setInt(1, indexSel);
-                    ps.addBatch();
-                    
-                    conn.setAutoCommit(false);
-                    ps.executeBatch();
-                    conn.setAutoCommit(true);
+                            Statement stat = conn.createStatement();
 
-                    conn.close();
-                } catch (SQLException e) {
-                    System.out.println(e.getMessage());
+                            String sql = "delete from persone where id=? and userid=?;";
+                           
+                            PreparedStatement ps = conn.prepareStatement(sql);
+                            ps.setInt(1, indexSel);
+                            ps.setInt(2, userid);
+                            ps.addBatch();
+
+                            conn.setAutoCommit(false);
+                            ps.executeBatch();
+                            conn.setAutoCommit(true);
+
+                            conn.close();
+                        } catch (SQLException e) {
+                            System.out.println(e.getMessage());
+                        }
+                        
+                        eliminaFinestra(indexSelTab);
+                    }
                 }
-                
-                try {
-                    eliminaFinestra(indexSel);
-                } catch (FileNotFoundException ex) {
-                    System.err.println(ex);
-                }
+                    
             }
+            
         }
         else{
             JOptionPane.showMessageDialog(null, "Seleziona un contatto.");
         }
     }//GEN-LAST:event_eliminaBActionPerformed
+
+    private void logoutBActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_logoutBActionPerformed
+        int input = JOptionPane.showConfirmDialog(null, "Sei sicuro di volere uscire?");
+        if(input==0){
+            super.dispose();
+        }       
+    }//GEN-LAST:event_logoutBActionPerformed
 
     /**
      * @param args the command line arguments
@@ -492,6 +530,7 @@ public class FinestraPrincipale extends javax.swing.JFrame {
     private javax.swing.JButton eliminaB;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JToolBar jToolBar1;
+    private javax.swing.JButton logoutB;
     private javax.swing.JButton modificaB;
     private javax.swing.JTable table;
     // End of variables declaration//GEN-END:variables

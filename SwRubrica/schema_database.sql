@@ -1,0 +1,2 @@
+create table if not exists persone (userid Integer, id Integer primary key, nome varchar, cognome varchar, indirizzo varchar, telefono varchar, eta Integer);
+create table if not exists utenti (userid Integer primary key, username varchar, password varchar);

@@ -22,7 +22,7 @@ import java.sql.*;
 
 /**
  *
- * @author babya
+ * @author anne
  */
 public class SwRubrica {
     
@@ -33,6 +33,7 @@ public class SwRubrica {
     private final String password = "rubric@";
     private Connection conn;
     private boolean connesso = false;
+    private int userid;
     
     public SwRubrica(){
         contatti = new Vector<Persona>();
@@ -42,8 +43,28 @@ public class SwRubrica {
         return this.contatti;
     }
     
+    public Vector<Persona> getContatti(int u){
+        return this.contatti;
+    }
+    
     public void setContatti(Vector<Persona> c){
         this.contatti = c;
+    }
+
+    public int getUserid() {
+        return userid;
+    }
+
+    public void setUserid(int userid) {
+        this.userid = userid;
+    }
+
+    /*
+    Inizializza la finestra della rubrica dell'utente corrente.
+    */
+    public void startSwRubrica(int u){
+        SwRubrica sr = new SwRubrica();
+        sr.initGUI(u);
     }
     
     /*
@@ -117,22 +138,23 @@ public class SwRubrica {
         
         SwRubrica r = new SwRubrica();
         
-        r.initGUI();
+        //r.initGUI();
     }
     
     /*
     Inizializza la finestra principale.
     */
-    public void initGUI(){
+    public void initGUI(int u){
         
-        finestra = new FinestraPrincipale();
+        finestra = new FinestraPrincipale(u);
         finestra.setVisible(true);
     }
     
     /*
     Crea un contatto in Rubrica.
     */
-    public void creaContatto(Persona p) throws FileNotFoundException{
+    public void creaContatto(Persona p)
+    {
         if(contatti.contains(p)){
             JOptionPane.showMessageDialog(null, "Contatto gia' esistente.");
             System.out.println("Contatto gia' esistente.");
@@ -140,10 +162,10 @@ public class SwRubrica {
         else{
             contatti.addElement(p); 
 
-            aggiornaFileSwRubrica();
+            //aggiornaFileSwRubrica();
             JOptionPane.showMessageDialog(null, p.getNome().toUpperCase()+" "+ p.getCognome().toUpperCase()+" aggiunto.");
             System.out.println("Persona: "+ p.toString() +" aggiunto.");
-        }          
+        }
     }
     
     /*
@@ -159,7 +181,7 @@ public class SwRubrica {
             per.setEta(pn.eta);
             contatti.setElementAt(per, i);
             
-            aggiornaFileSwRubrica();
+            //aggiornaFileSwRubrica();
             
             JOptionPane.showMessageDialog(null, "Contatto modificato.");
             System.out.println("Contatto modificato.");
@@ -173,7 +195,7 @@ public class SwRubrica {
         if(contatti.contains(p)){
             contatti.remove(p);
             
-            aggiornaFileSwRubrica();
+            //aggiornaFileSwRubrica();
            
             JOptionPane.showMessageDialog(null, p.getNome().toUpperCase()+" "+p.getCognome().toUpperCase()+" eliminato.");
             System.out.println("Contatto eliminato.");

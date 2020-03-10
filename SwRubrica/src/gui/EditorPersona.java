@@ -6,7 +6,6 @@
 package gui;
 
 import java.awt.Color;
-import java.io.FileNotFoundException;
 import swrubrica.Persona;
 import swrubrica.SwRubrica;
 
@@ -14,10 +13,12 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.*;
+import java.util.Vector;
+import swrubrica.DettagliConnessione;
 
 /**
  *
- * @author babya
+ * @author anne
  */
 public class EditorPersona extends javax.swing.JFrame {
     
@@ -34,20 +35,27 @@ public class EditorPersona extends javax.swing.JFrame {
     private Persona personaV;
     private int indexV;
     
-    private final String url = "jdbc:postgresql://localhost:5432/rubrica_postgresql";
-    private final String username = "rubrica";
-    private final String password = "rubric@";
+    private String url = "";
+    private String username = "";
+    private String password = "";
     
     private Connection conn;
     private boolean connesso = false;
     
     private SwRubrica rubrica;
+    private int userid;
 
     /**
-     * Creates new form EditorPersona
+     * Crea un nuovo form EditorPersona
      */
     public EditorPersona() {
         initComponents();
+        DettagliConnessione dc = new DettagliConnessione();
+        dc.settaDettagli();
+        url = dc.getUrl();
+        username = dc.getUsername();
+        password = dc.getPassword();
+        
         rubrica = new SwRubrica();
         
         rubrica.setContatti(rubrica.listaContatti());
@@ -55,27 +63,50 @@ public class EditorPersona extends javax.swing.JFrame {
         modificaFlag = false;
     }
     
-    /*
-    Costruttore EditorPersona per la modifica contatto.
-    */
-    public EditorPersona(String n, String c, int i) {
+    /**
+     Costruttore EditorPersona per la creazione di un contatto.
+     */
+    public EditorPersona(int u) {
         initComponents();
         
-        rubrica = new SwRubrica();
-        rubrica.setContatti(rubrica.listaContatti());
+        DettagliConnessione dc = new DettagliConnessione();
+        dc.settaDettagli();
+        url = dc.getUrl();
+        username = dc.getUsername();
+        password = dc.getPassword();
         
-        Persona rp = rubrica.getContatti().get(i);
+        rubrica = new SwRubrica();
+        userid = u;
+        rubrica.setContatti(getLista());
+        creaFlag = true;
+        modificaFlag = false;
+    }
+    
+    /*
+    Costruttore EditorPersona per la modifica di un contatto.
+    */
+    public EditorPersona(String n, String c, int i, int u) {
+        initComponents();
+        
+        DettagliConnessione dc = new DettagliConnessione();
+        dc.settaDettagli();
+        url = dc.getUrl();
+        username = dc.getUsername();
+        password = dc.getPassword();
+        
+        rubrica = new SwRubrica();
+        userid = u;
+        rubrica.setContatti(getLista());
+        
+        Persona rp = trovaPersona(rubrica.getContatti(), i);
+        
         personaV = rp;
         nomeV = rp.getNome();
         cognomeV = rp.getCognome();
         indirizzoV = rp.getIndirizzo();
         telefonoV = rp.getTelefono();
         etaV = rp.getEta();
-        
-        System.out.println(rp.toString());
-        System.out.println(rubrica.getContatti().indexOf(personaV));
-        
-        indexV = rubrica.getContatti().indexOf(personaV);
+        indexV = rp.getId();
         
         nomeTF.setText(rp.getNome());
         cognomeTF.setText(rp.getCognome());
@@ -88,7 +119,78 @@ public class EditorPersona extends javax.swing.JFrame {
         modificaFlag = true;
     }
     
+    /*
+    Trova la persona in vp con id uguale a i.
+    */
+    public Persona trovaPersona(Vector<Persona> vp, int i){
+        
+        boolean trovata = false;
+        String nome ="";
+        String cognome = "";
+        String indirizzo = "";
+        String telefono = "";
+        int eta = 0;
+        
+        for(int c=0; c<vp.size(); c++){
+            Persona p = vp.get(c);
+            if(p.getId()==i){
+                nome = p.getNome();
+                cognome = p.getCognome();
+                indirizzo = p.getIndirizzo();
+                telefono = p.getTelefono();
+                eta = p.getEta();
+                trovata = true;
+            }
+        }
+        if(trovata){
+            Persona c = new Persona(nome, cognome, indirizzo, telefono, eta);
+            c.setId(i);
+            return c;
+        }
+        else
+            return null;
+    }
     
+    /*
+    Recupera la lista di contatti dell'utente corrente.
+    */
+    public Vector<Persona> getLista(){
+        Vector<Persona> lista = new Vector<Persona>();
+        try {
+            conn = DriverManager.getConnection(url, username, password);
+            connesso = true;
+            System.out.println("Connesso a PostgreSQL server.");
+
+            PreparedStatement stat = conn.prepareStatement("select * from persone where userid=?;");    
+            stat.setInt(1, userid);               
+            
+            ResultSet rs = stat.executeQuery();
+            
+            while(rs.next()){
+                int index = rs.getInt("id");
+                String nome = rs.getString("nome");
+                String cognome = rs.getString("cognome");
+                String indirizzo = rs.getString("indirizzo");
+                String telefono = rs.getString("telefono");
+                int eta = rs.getInt("eta");
+                System.out.println(index+" "+nome+" "+cognome+" "+indirizzo+" "+telefono+" "+eta);
+                Persona p = new Persona(nome, cognome, indirizzo, telefono, eta);
+                p.setId(index);
+                lista.add(p);
+            }
+
+            rs.close(); 
+
+            conn.setAutoCommit(false);
+            
+            conn.setAutoCommit(true);
+
+            conn.close();
+        } catch (SQLException e) {
+                System.out.println(e.getMessage());
+        }
+        return lista;
+    }
 
     /**
      * This method is called from within the constructor to initialize the form.
@@ -287,6 +389,7 @@ public class EditorPersona extends javax.swing.JFrame {
     private void salvaBActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_salvaBActionPerformed
         salva = true;
         boolean valida = true;
+        boolean nuovaPersonaFlag = true;
         String nome = nomeTF.getText();
         if(nome.equals("")){
             nomeTF.setBackground(Color.red);
@@ -325,58 +428,62 @@ public class EditorPersona extends javax.swing.JFrame {
         }
         
         Persona p = new Persona(nome, cognome, indirizzo, telefono, eta);
-        if(creaFlag && valida){
-            try{
-                System.out.println("Crea contatto");
-                rubrica.creaContatto(p);
-                int index = rubrica.trovaIndice(nome, cognome, telefono);
-                
-                try {
-                    conn = DriverManager.getConnection(url, username, password);
-                    connesso = true;
-                    System.out.println("Connesso a PostgreSQL server.");
-                    System.out.println("Nel salvaCreaAction");
-
-                    Statement stat = conn.createStatement();
-                   
-                    String sql = "insert into Persone values(?,?,?,?,?,?);";
-                    
-                    PreparedStatement ps = conn.prepareStatement(sql);
-                    
-                    ps.setInt(1, index);
-                    System.out.print(index+" ");
-                    ps.setString(2, rubrica.getContatti().get(index).getNome());
-                    System.out.print(rubrica.getContatti().get(index).getNome()+" ");
-                    ps.setString(3, rubrica.getContatti().get(index).getCognome());
-                    System.out.print(rubrica.getContatti().get(index).getCognome()+" ");
-                    ps.setString(4, rubrica.getContatti().get(index).getIndirizzo());
-                    System.out.print(rubrica.getContatti().get(index).getIndirizzo()+" ");
-                    ps.setString(5, rubrica.getContatti().get(index).getTelefono());
-                    System.out.print(rubrica.getContatti().get(index).getTelefono()+" ");
-                    ps.setInt(6, rubrica.getContatti().get(index).getEta());
-                    System.out.println(rubrica.getContatti().get(index).getEta());
-                    ps.addBatch();
-              
-                    
-                    conn.setAutoCommit(false);
-                    ps.executeBatch();
-                    conn.setAutoCommit(true);
-
-                    conn.close();
-                } catch (SQLException e) {
-                    System.out.println(e.getMessage());
-                }
-                
-            }
-            catch(FileNotFoundException e){System.err.println(e);}
-            
-            creaFlag = false;
-         
+        int indexMax = 0;
+        for(int i=0; i<rubrica.getContatti().size(); i++){
+            Persona c = rubrica.getContatti().get(i);
+            if(c.getId()>indexMax)
+                indexMax = c.getId(); 
         }
-        if(modificaFlag && valida){
+        int indexP = indexMax+1;
+        p.setId(indexP);
+        if(creaFlag && valida){
             
-            rubrica.modificaContatto(indexV, p);
+            System.out.println("Crea contatto");
+            //rubrica.getContatti().add(p);
+            rubrica.creaContatto(p);
+            //int index = rubrica.trovaIndice(nome, cognome, telefono);
+            
+            try {
+                conn = DriverManager.getConnection(url, username, password);
+                connesso = true;
+                System.out.println("Connesso a PostgreSQL server.");
+                System.out.println("Nel salvaCreaAction");
 
+                Statement stat = conn.createStatement();
+
+                String sql = "insert into persone values(?,?,?,?,?,?,?);";
+
+                PreparedStatement ps = conn.prepareStatement(sql);
+
+                ps.setInt(1, userid);
+                ps.setInt(2, indexP);
+                System.out.print(indexP+" ");
+                ps.setString(3, nome);
+                System.out.print(nome+" ");
+                ps.setString(4, cognome);
+                System.out.print(cognome+" ");
+                ps.setString(5, indirizzo);
+                System.out.print(indirizzo+" ");
+                ps.setString(6, telefono);
+                System.out.print(telefono+" ");
+                ps.setInt(7, eta);
+                System.out.println(eta);
+                ps.addBatch();
+
+                conn.setAutoCommit(false);
+                ps.executeBatch();
+                conn.setAutoCommit(true);
+
+                conn.close();
+            } catch (SQLException e) {
+                System.out.println(e.getMessage());
+            }
+            creaFlag = false;
+            
+                
+       
+        }
+        if(modificaFlag && valida){           
                     
             int index = indexV;
                 
@@ -387,22 +494,17 @@ public class EditorPersona extends javax.swing.JFrame {
 
                 Statement stat = conn.createStatement();
          
-                String sql = "update Persone set nome=?, cognome=?, indirizzo=?, telefono=?, eta=? where id=?;";
+                String sql = "update persone set nome=?, cognome=?, indirizzo=?, telefono=?, eta=? where id=? and userid=?;";
               
                 PreparedStatement ps = conn.prepareStatement(sql);
                
-                ps.setString(1, rubrica.getContatti().get(index).getNome()+" ");
-                System.out.print(rubrica.getContatti().get(index).getNome()+" ");
-                ps.setString(2, rubrica.getContatti().get(index).getCognome());
-                System.out.print(rubrica.getContatti().get(index).getCognome()+" ");
-                ps.setString(3, rubrica.getContatti().get(index).getIndirizzo());
-                System.out.print(rubrica.getContatti().get(index).getIndirizzo()+" ");
-                ps.setString(4, rubrica.getContatti().get(index).getTelefono());
-                System.out.print(rubrica.getContatti().get(index).getTelefono()+" ");
-                ps.setInt(5, rubrica.getContatti().get(index).getEta());
-                System.out.print(rubrica.getContatti().get(index).getEta());
+                ps.setString(1, nome);
+                ps.setString(2, cognome);
+                ps.setString(3, indirizzo);
+                ps.setString(4, telefono);
+                ps.setInt(5, eta);
                 ps.setInt(6, index);
-                System.out.println(index);
+                ps.setInt(7, userid);
                 ps.addBatch();
 
                 conn.setAutoCommit(false);
@@ -419,8 +521,9 @@ public class EditorPersona extends javax.swing.JFrame {
         }
         
         if(valida){
+            
             super.dispose();
-            FinestraPrincipale fp = new FinestraPrincipale();
+            FinestraPrincipale fp = new FinestraPrincipale(userid);
             fp.setVisible(true);
         }
 
@@ -428,7 +531,7 @@ public class EditorPersona extends javax.swing.JFrame {
 
     private void annullaBActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_annullaBActionPerformed
         annulla = true;
-        FinestraPrincipale fp = new FinestraPrincipale();
+        FinestraPrincipale fp = new FinestraPrincipale(userid);
         fp.setVisible(true);
         super.dispose();
     }//GEN-LAST:event_annullaBActionPerformed
@@ -460,7 +563,7 @@ public class EditorPersona extends javax.swing.JFrame {
 
     private void formWindowClosed(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowClosed
         if(!salva && !annulla){
-            FinestraPrincipale fp = new FinestraPrincipale();
+            FinestraPrincipale fp = new FinestraPrincipale(userid);
             fp.setVisible(true);
         }
     }//GEN-LAST:event_formWindowClosed

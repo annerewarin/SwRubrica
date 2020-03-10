@@ -7,7 +7,7 @@ package swrubrica;
 
 /**
  *
- * @author babya
+ * @author anne
  */
 public class Persona {
     protected String nome;
@@ -15,6 +15,10 @@ public class Persona {
     protected String indirizzo;
     protected String telefono;
     protected int eta;
+    protected int id;
+    
+    public Persona(){
+    }
     
     public Persona(String n, String c, String i, String t, int e){
         this.nome = n;
@@ -22,6 +26,14 @@ public class Persona {
         this.indirizzo = i;
         this.telefono = t;
         this.eta = e;
+    }
+    
+    public void setId(int i){
+        this.id = i;
+    }
+    
+    public int getId(){
+        return this.id;
     }
 
     public String getNome() {
